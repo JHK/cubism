@@ -2,7 +2,6 @@ cubism.context = function() {
   var context = new cubism_context,
       step = 1e4, // ten seconds, in milliseconds
       size = 1440, // four hours at ten seconds, in pixels
-      componentWidth = 1440,
       start0, stop0, // the start and stop for the previous change event
       start1, stop1, // the start and stop for the next prepare event
       serverDelay = 5e3,
@@ -10,14 +9,10 @@ cubism.context = function() {
       event = d3.dispatch("prepare", "beforechange", "change", "focus"),
       scale = context.scale = d3.time.scale().range([0, size]),
       timeout,
-      xScale,
       focus;
 
   function update() {
-     xScale = componentWidth / size >= 1 ? componentWidth / size : 1;
-      scale.range([0, size * xScale]);
-
-      var now = Date.now();
+    var now = Date.now();
     stop0 = new Date(Math.floor((now - serverDelay - clientDelay) / step) * step);
     start0 = new Date(stop0 - size * step);
     stop1 = new Date(Math.floor((now - serverDelay) / step) * step);
@@ -25,10 +20,6 @@ cubism.context = function() {
     scale.domain([start0, stop0]);
     return context;
   }
-
-    context.xScale = function(){
-        return xScale;
-    };
 
   context.start = function() {
     if (timeout) clearTimeout(timeout);
@@ -73,15 +64,10 @@ cubism.context = function() {
   // Defaults to 1440 (four hours at ten seconds).
   context.size = function(_) {
     if (!arguments.length) return size;
-      size = +_;
+    scale.range([0, size = +_]);
     return update();
   };
 
-    context.componentWidth = function(_) {
-        if (!arguments.length) return componentWidth;
-        componentWidth = +_;
-        return update();
-    };
   // The server delay is the amount of time we wait for the server to compute a
   // metric. This delay may result from clock skew or from delays collecting
   // metrics from various hosts. Defaults to 4 seconds.

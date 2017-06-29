@@ -1,8 +1,7 @@
 cubism_contextPrototype.axis = function() {
   var context = this,
       scale = context.scale,
-      axis_ = d3.svg.axis().scale(scale),
-        xScale = context.xScale();
+      axis_ = d3.svg.axis().scale(scale);
 
   var formatDefault = context.step() < 6e4 ? cubism_axisFormatSeconds
       : context.step() < 864e5 ? cubism_axisFormatMinutes
@@ -12,10 +11,10 @@ cubism_contextPrototype.axis = function() {
   function axis(selection) {
     var id = ++cubism_id,
         tick;
-      var axisWidth = Math.floor(context.size() * xScale);
+
     var g = selection.append("svg")
         .datum({id: id})
-        .attr("width", axisWidth)
+        .attr("width", context.size())
         .attr("height", Math.max(28, -axis.tickSize()))
       .append("g")
         .attr("transform", "translate(0," + (axis_.orient() === "top" ? 27 : 4) + ")")
@@ -34,7 +33,7 @@ cubism_contextPrototype.axis = function() {
           tick.style("display", "none");
           g.selectAll("text").style("fill-opacity", null);
         } else {
-          tick.style("display", null).attr("x", i).text(format(scale.invert(i)));  //affects where the hover time displayes
+          tick.style("display", null).attr("x", i).text(format(scale.invert(i)));
           var dx = tick.node().getComputedTextLength() + 6;
           g.selectAll("text").style("fill-opacity", function(d) { return Math.abs(scale(d) - i) < dx ? 0 : 1; });
         }

@@ -24,7 +24,6 @@ cubism.context = function() {
   var context = new cubism_context,
       step = 1e4, // ten seconds, in milliseconds
       size = 1440, // four hours at ten seconds, in pixels
-      componentWidth = 1440,
       start0, stop0, // the start and stop for the previous change event
       start1, stop1, // the start and stop for the next prepare event
       serverDelay = 5e3,
@@ -32,14 +31,10 @@ cubism.context = function() {
       event = d3.dispatch("prepare", "beforechange", "change", "focus"),
       scale = context.scale = d3.time.scale().range([0, size]),
       timeout,
-      xScale,
       focus;
 
   function update() {
-     xScale = componentWidth / size >= 1 ? componentWidth / size : 1;
-      scale.range([0, size * xScale]);
-
-      var now = Date.now();
+    var now = Date.now();
     stop0 = new Date(Math.floor((now - serverDelay - clientDelay) / step) * step);
     start0 = new Date(stop0 - size * step);
     stop1 = new Date(Math.floor((now - serverDelay) / step) * step);
@@ -47,10 +42,6 @@ cubism.context = function() {
     scale.domain([start0, stop0]);
     return context;
   }
-
-    context.xScale = function(){
-        return xScale;
-    };
 
   context.start = function() {
     if (timeout) clearTimeout(timeout);
@@ -95,15 +86,10 @@ cubism.context = function() {
   // Defaults to 1440 (four hours at ten seconds).
   context.size = function(_) {
     if (!arguments.length) return size;
-      size = +_;
+    scale.range([0, size = +_]);
     return update();
   };
 
-    context.componentWidth = function(_) {
-        if (!arguments.length) return componentWidth;
-        componentWidth = +_;
-        return update();
-    };
   // The server delay is the amount of time we wait for the server to compute a
   // metric. This delay may result from clock skew or from delays collecting
   // metrics from various hosts. Defaults to 4 seconds.
@@ -693,10 +679,6 @@ cubism_contextPrototype.metric = function(request, name) {
     return values[i];
   };
 
-  metric.values = function() {
-      return values;
-  };
-
   //
   metric.shift = function(offset) {
     return context.metric(cubism_metricShift(request, +offset));
@@ -813,10 +795,9 @@ cubism_metricPrototype.divide = cubism_metricOperator("/", function(left, right)
 });
 cubism_contextPrototype.horizon = function() {
   var context = this,
-      xScale = context.xScale(),
       mode = "offset",
       buffer = document.createElement("canvas"),
-      dataSize =  context.size(),
+      width = buffer.width = context.size(),
       height = buffer.height = 30,
       scale = d3.scale.linear().interpolate(d3.interpolateRound),
       metric = cubism_identity,
@@ -824,19 +805,15 @@ cubism_contextPrototype.horizon = function() {
       title = cubism_identity,
       format = d3.format(".2s"),
       colors = ["#08519c","#3182bd","#6baed6","#bdd7e7","#bae4b3","#74c476","#31a354","#006d2c"];
-    var rLeft, rWidth;
-    buffer.width = dataSize * xScale;
 
   function horizon(selection) {
 
     selection
-        //here focus is being set to mouse x, but other places it corresponds to the data array index.
         .on("mousemove.horizon", function() { context.focus(Math.round(d3.mouse(this)[0])); })
         .on("mouseout.horizon", function() { context.focus(null); });
 
-
     selection.append("canvas")
-        .attr("width", dataSize * xScale)
+        .attr("width", width)
         .attr("height", height);
 
     selection.append("span")
@@ -875,18 +852,13 @@ cubism_contextPrototype.horizon = function() {
         var i0 = 0, max = Math.max(-extent[0], extent[1]);
         if (this === context) {
           if (max == max_) {
-            i0 = dataSize - (cubism_metricOverlap);
+            i0 = width - cubism_metricOverlap;
             var dx = (start1 - start) / step;
-            if (dx < dataSize) {
-                buffer.width = dataSize * xScale;
+            if (dx < width) {
               var canvas0 = buffer.getContext("2d");
-                rWidth = dataSize * xScale;
-              canvas0.clearRect(0, 0, rWidth, height);
-                rLeft = dx * xScale;
-                rWidth = (dataSize - dx) * xScale;
-              canvas0.drawImage(canvas.canvas, rLeft, 0, rWidth, height, 0, 0, rWidth, height);
-                rWidth = dataSize * xScale ;
-              canvas.clearRect(0, 0, rWidth, height);
+              canvas0.clearRect(0, 0, width, height);
+              canvas0.drawImage(canvas.canvas, dx, 0, width - dx, height, 0, 0, width - dx, height);
+              canvas.clearRect(0, 0, width, height);
               canvas.drawImage(canvas0.canvas, 0, 0);
             }
           }
@@ -897,16 +869,12 @@ cubism_contextPrototype.horizon = function() {
         scale.domain([0, max_ = max]);
 
         // clear for the new data
-          rWidth = (dataSize - i0) * xScale;
-          rLeft = i0 * xScale;
-        canvas.clearRect(rLeft, 0, rWidth, height);
+        canvas.clearRect(i0, 0, width - i0, height);
 
         // record whether there are negative values to display
         var negative;
 
         // positive bands
-        var time = new Date();
-
         for (var j = 0; j < m; ++j) {
           canvas.fillStyle = colors_[m + j];
 
@@ -915,13 +883,11 @@ cubism_contextPrototype.horizon = function() {
           scale.range([m * height + y0, y0]);
           y0 = scale(0);
 
-          for (var i = i0, n = dataSize, y1; i < n; ++i) {
+          for (var i = i0, n = width, y1; i < n; ++i) {
             y1 = metric_.valueAt(i);
-              rLeft = Math.round(i*xScale);
-              rWidth = Math.round(xScale);
             if (y1 <= 0) { negative = true; continue; }
             if (y1 === undefined) continue;
-            canvas.fillRect(rLeft, y1 = scale(y1), rWidth, y0 - y1);
+            canvas.fillRect(i, y1 = scale(y1), 1, y0 - y1);
           }
         }
 
@@ -941,11 +907,10 @@ cubism_contextPrototype.horizon = function() {
             scale.range([m * height + y0, y0]);
             y0 = scale(0);
 
-            for (var i = i0, n = dataSize, y1; i < n; ++i) {
+            for (var i = i0, n = width, y1; i < n; ++i) {
               y1 = metric_.valueAt(i);
               if (y1 >= 0) continue;
-              canvas.fillRect(Math.round(i*xScale), scale(-y1),
-                  Math.round(xScale), y0 - scale(-y1));
+              canvas.fillRect(i, scale(-y1), 1, y0 - scale(-y1));
             }
           }
         }
@@ -953,14 +918,10 @@ cubism_contextPrototype.horizon = function() {
         canvas.restore();
       }
 
-      function focus(mouse_x) {
-        if (mouse_x == null) mouse_x = dataSize - 1;
-        // since we are getting mouse_x and it's a scaled value,
-        // need to convert this back to an index to look up
-        var index = Math.round(mouse_x/xScale);
-        var value = metric_.valueAt(index);
+      function focus(i) {
+        if (i == null) i = width - 1;
+        var value = metric_.valueAt(i);
         span.datum(value).text(isNaN(value) ? null : format);
-          span.style("left", mouse_x+"px");
       }
 
       // Update the chart when the context changes.
@@ -1281,8 +1242,7 @@ function cubism_comparisonRoundOdd(i) {
 cubism_contextPrototype.axis = function() {
   var context = this,
       scale = context.scale,
-      axis_ = d3.svg.axis().scale(scale),
-        xScale = context.xScale();
+      axis_ = d3.svg.axis().scale(scale);
 
   var formatDefault = context.step() < 6e4 ? cubism_axisFormatSeconds
       : context.step() < 864e5 ? cubism_axisFormatMinutes
@@ -1292,10 +1252,10 @@ cubism_contextPrototype.axis = function() {
   function axis(selection) {
     var id = ++cubism_id,
         tick;
-      var axisWidth = Math.floor(context.size() * xScale);
+
     var g = selection.append("svg")
         .datum({id: id})
-        .attr("width", axisWidth)
+        .attr("width", context.size())
         .attr("height", Math.max(28, -axis.tickSize()))
       .append("g")
         .attr("transform", "translate(0," + (axis_.orient() === "top" ? 27 : 4) + ")")
@@ -1314,7 +1274,7 @@ cubism_contextPrototype.axis = function() {
           tick.style("display", "none");
           g.selectAll("text").style("fill-opacity", null);
         } else {
-          tick.style("display", null).attr("x", i).text(format(scale.invert(i)));  //affects where the hover time displayes
+          tick.style("display", null).attr("x", i).text(format(scale.invert(i)));
           var dx = tick.node().getComputedTextLength() + 6;
           g.selectAll("text").style("fill-opacity", function(d) { return Math.abs(scale(d) - i) < dx ? 0 : 1; });
         }
@@ -1390,10 +1350,10 @@ cubism_contextPrototype.rule = function() {
       metric_.on("change.rule-" + id, change);
     });
 
-    context.on("focus.rule-" + id, function(mouse_x) {
-      line.datum(mouse_x)
-          .style("display", mouse_x == null ? "none" : null)
-          .style("left", mouse_x == null ? null : cubism_ruleLeft);
+    context.on("focus.rule-" + id, function(i) {
+      line.datum(i)
+          .style("display", i == null ? "none" : null)
+          .style("left", i == null ? null : cubism_ruleLeft);
     });
   }
 
