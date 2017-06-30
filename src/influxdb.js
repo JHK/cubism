@@ -55,7 +55,9 @@ function influxMetrics(dataJson, column) {
   if (metricIndex < 0) {
     metricIndex = json.results[0].series[0].columns.length - 1;
   }
-  return json.results[0].series[0].values.map(function(row) {
+  var metricValues = json.results[0].series[0].values.map(function(row) {
     return row[metricIndex];
   });
+  if (metricValues[0] == 0) {metricValues[0] = metricValues[1]}; // see https://github.com/influxdata/influxdb/issues/8244
+  return metricValues;
 };
