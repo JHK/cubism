@@ -473,7 +473,9 @@ cubism_contextPrototype.influxdb = function(host, database) {
 
 function buildInfluxQuery(select, from, where, start, stop, step) {
   where = (where === undefined) ? [] : JSON.parse(JSON.stringify(where));
-  where.push(`time < ${influxDateFormat(stop)} AND time > ${influxDateFormat(start)}`)
+
+  // start - step to be able to throw away one value. See also https://github.com/influxdata/influxdb/issues/8244
+  where.push(`time < ${influxDateFormat(stop)} AND time > ${influxDateFormat(new Date(start - new Date(step)))}`)
 
   return `SELECT ${select} ` +
     `FROM ${from} ` +
@@ -499,7 +501,10 @@ function influxMetrics(dataJson, column) {
   var metricValues = json.results[0].series[0].values.map(function(row) {
     return row[metricIndex];
   });
-  if (metricValues[0] == 0) {metricValues[0] = metricValues[1]}; // see https://github.com/influxdata/influxdb/issues/8244
+
+  // Throw away first value. See https://github.com/influxdata/influxdb/issues/8244
+  metricValues.shift();
+
   return metricValues;
 };
 cubism_contextPrototype.gangliaWeb = function(config) {
