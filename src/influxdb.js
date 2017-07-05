@@ -40,7 +40,7 @@ function buildInfluxQuery(select, from, where, start, stop, step) {
     `FROM ${from} ` +
     `WHERE ${where.join(" AND ")} ` +
     `GROUP BY time(${step*1000}u) ` +
-    `FILL(0)`;
+    `FILL(previous)`;
 };
 
 function influxDateFormat(d) {
