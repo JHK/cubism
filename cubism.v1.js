@@ -449,10 +449,13 @@ cubism_contextPrototype.influxdb = function(host, database) {
   //   .select - data to select
   //   .from   - name of influx series
   //   .where  - array of where clauses
+  //   .fill   - fill with values not present in database, defaults to "FILL(0)"
   // example: metric({select: "sum(requests)", from: "myapp", where: ["host='host-1'"]})
   source.metric = function(expression) {
+    var fill = expression.fill === undefined ? "FILL(0)" : expression.fill;
+
     return context.metric(function(start, stop, step, callback) {
-      var influxQuery = buildInfluxQuery(expression.select, expression.from, expression.where, start, stop, step);
+      var influxQuery = buildInfluxQuery(expression.select, expression.from, expression.where, fill, start, stop, step);
       var urlquery = `query?q=${encodeURIComponent(influxQuery)}&db=${database}`;
       var url = host + urlquery;
 
@@ -471,17 +474,19 @@ cubism_contextPrototype.influxdb = function(host, database) {
   return source;
 };
 
-function buildInfluxQuery(select, from, where, start, stop, step) {
+function buildInfluxQuery(select, from, where, fill, start, stop, step) {
   where = (where === undefined) ? [] : JSON.parse(JSON.stringify(where));
 
   // start - step to be able to throw away one value. See also https://github.com/influxdata/influxdb/issues/8244
   where.push(`time < ${influxDateFormat(stop)} AND time > ${influxDateFormat(new Date(start - new Date(step)))}`)
 
+
+
   return `SELECT ${select} ` +
     `FROM ${from} ` +
     `WHERE ${where.join(" AND ")} ` +
     `GROUP BY time(${step*1000}u) ` +
-    `FILL(0)`;
+    fill;
 };
 
 function influxDateFormat(d) {
